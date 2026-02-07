@@ -1,0 +1,20 @@
+openapi: 3.0.3
+info:
+  title: Games System API
+  version: 1.0.0
+  description: 遊戲遊玩平台 API
+
+servers:
+  - url: https://api.example.com/games/v1
+
+paths: {}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

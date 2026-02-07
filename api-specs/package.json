@@ -1,0 +1,11 @@
+{
+  "name": "@company/api-specs",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    "./pos-systems": "./projects/pos-systems/openapi.yaml",
+    "./token-system": "./projects/token-system/openapi.yaml",
+    "./games-system": "./projects/games-system/openapi.yaml",
+    "./shared/*": "./shared/*"
+  }
+}

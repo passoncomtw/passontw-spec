@@ -1,0 +1,20 @@
+openapi: 3.0.3
+info:
+  title: POS System API
+  version: 1.0.0
+  description: POS 系統 API
+
+servers:
+  - url: https://api.example.com/pos/v1
+
+paths: {}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

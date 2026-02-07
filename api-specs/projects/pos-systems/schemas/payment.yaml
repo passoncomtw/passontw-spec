@@ -1,0 +1,5 @@
+components:
+  schemas:
+    Payment:
+      type: object
+      description: 支付，內容後續補充

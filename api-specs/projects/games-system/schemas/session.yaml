@@ -1,0 +1,5 @@
+components:
+  schemas:
+    Session:
+      type: object
+      description: 遊戲場次，內容後續補充

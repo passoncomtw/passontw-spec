@@ -1,0 +1,5 @@
+components:
+  schemas:
+    Order:
+      type: object
+      description: 訂單，內容後續補充
