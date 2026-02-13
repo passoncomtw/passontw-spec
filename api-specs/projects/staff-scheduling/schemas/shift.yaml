@@ -1,0 +1,5 @@
+components:
+  schemas:
+    Shift:
+      type: object
+      description: 班次，內容後續補充

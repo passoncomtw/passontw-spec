@@ -1,0 +1,8 @@
+components:
+  schemas:
+    Merchant:
+      type: object
+      description: 商家，內容後續補充
+    MerchantConnectionStatus:
+      type: object
+      description: 商家連線狀況（營運後台用），內容後續補充

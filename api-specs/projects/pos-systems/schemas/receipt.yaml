@@ -1,0 +1,5 @@
+components:
+  schemas:
+    Receipt:
+      type: object
+      description: 出單／收據，內容後續補充

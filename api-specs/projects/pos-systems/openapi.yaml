@@ -2,12 +2,61 @@ openapi: 3.0.3
 info:
   title: POS System API
   version: 1.0.0
-  description: POS 系統 API
+  description: |
+    POS 系統含兩套前端與對應後端 API：
+
+    - **營運後台**：Web 後台，後端部署於 Linux server。提供統一 admin 登入/登出、各商家連線狀況。
+    - **商家 App**：Electron 應用，後端部署於各商家樹莓派、區域網路連線。提供員工登入/登出、商品管理（先以關東煮店為基礎）、結帳、連線出單機。
 
 servers:
-  - url: https://api.example.com/pos/v1
+  - url: https://api.example.com/pos/admin/v1
+    description: 營運後台 API（Linux server）
+  - url: http://{storeHost}/pos/store/v1
+    description: 商家端 API（樹莓派，區域網路）
+    variables:
+      storeHost:
+        default: 192.168.1.1
 
-paths: {}
+paths:
+  # --- 營運後台 ---
+  /admin/auth/login:
+    post:
+      summary: 營運後台 admin 登入
+  /admin/auth/logout:
+    post:
+      summary: 營運後台 admin 登出
+  /admin/merchants:
+    get:
+      summary: 商家列表
+  /admin/merchants/{merchantId}/connection-status:
+    get:
+      summary: 單一商家連線狀況
+
+  # --- 商家 App（員工、商品、結帳、出單）---
+  /auth/login:
+    post:
+      summary: 員工登入
+  /auth/logout:
+    post:
+      summary: 員工登出
+  /products:
+    get:
+      summary: 商品列表
+    post:
+      summary: 新增商品（關東煮等）
+  /products/{productId}:
+    get:
+      summary: 單一商品
+    put:
+      summary: 更新商品
+    delete:
+      summary: 刪除商品
+  /checkout:
+    post:
+      summary: 結帳
+  /receipts/print:
+    post:
+      summary: 連線出單機列印
 
 components:
   securitySchemes:

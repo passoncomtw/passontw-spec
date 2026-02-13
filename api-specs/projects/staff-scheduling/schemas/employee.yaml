@@ -1,0 +1,5 @@
+components:
+  schemas:
+    Employee:
+      type: object
+      description: 員工，內容後續補充

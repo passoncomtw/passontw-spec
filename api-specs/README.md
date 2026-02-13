@@ -9,6 +9,7 @@
 | pos-systems | POS 系統 |
 | token-system | 幣安 C2C 平台 |
 | games-system | 遊戲遊玩平台 |
+| staff-scheduling | 人員排班 |
 
 ## 目錄
 

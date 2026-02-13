@@ -1,2 +1,8 @@
 components:
-  schemas: {}
+  schemas:
+    AdminSession:
+      type: object
+      description: 營運後台 admin 登入 session，內容後續補充
+    EmployeeSession:
+      type: object
+      description: 商家端員工登入 session，內容後續補充

@@ -1,11 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
-PROJECTS="pos-systems token-system games-system"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$ROOT_DIR"
 
+PROJECTS="pos-systems token-system games-system staff-scheduling"
+
 for project in $PROJECTS; do
   echo "Validating $project..."
-  spectral lint "projects/$project/openapi.yaml" --ruleset .spectral.yaml 2>/dev/null || true
+  if command -v spectral &>/dev/null; then
+    spectral lint "projects/$project/openapi.yaml" --ruleset .spectral.yaml 2>/dev/null || spectral lint "projects/$project/openapi.yaml"
+  elif command -v npx &>/dev/null; then
+    npx --yes @stoplight/spectral-cli lint "projects/$project/openapi.yaml"
+  else
+    echo "Spectral not found, skip lint. Install: npm i -g @stoplight/spectral-cli"
+  fi
 done
+
+echo "Validate done."

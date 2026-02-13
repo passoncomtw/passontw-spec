@@ -1,0 +1,5 @@
+components:
+  schemas:
+    Product:
+      type: object
+      description: 商品（先以關東煮店為基礎），內容後續補充

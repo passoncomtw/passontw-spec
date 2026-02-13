@@ -1,0 +1,20 @@
+openapi: 3.0.3
+info:
+  title: Staff Scheduling API
+  version: 1.0.0
+  description: 人員排班 API
+
+servers:
+  - url: https://api.example.com/staff-scheduling/v1
+
+paths: {}
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - bearerAuth: []

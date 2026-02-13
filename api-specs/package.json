@@ -6,6 +6,7 @@
     "./pos-systems": "./projects/pos-systems/openapi.yaml",
     "./token-system": "./projects/token-system/openapi.yaml",
     "./games-system": "./projects/games-system/openapi.yaml",
+    "./staff-scheduling": "./projects/staff-scheduling/openapi.yaml",
     "./shared/*": "./shared/*"
   }
 }
