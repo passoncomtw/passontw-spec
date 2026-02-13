@@ -1,0 +1,15 @@
+components:
+  schemas:
+    FallbackConfig:
+      type: object
+      description: Fallback 順序由高到低（速度與性能遞減）
+      required:
+        - order
+      properties:
+        order:
+          type: array
+          items:
+            type: string
+            enum: [nvidia-kimi, openrouter-pony, local-ollama]
+          example: [nvidia-kimi, openrouter-pony, local-ollama]
+          description: 供應商 ID 依序，第一項為首選

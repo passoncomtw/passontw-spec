@@ -1,0 +1,43 @@
+components:
+  schemas:
+    Provider:
+      type: object
+      description: 單一 LLM 供應商與其目前狀態
+      required:
+        - id
+        - name
+        - status
+        - priority
+      properties:
+        id:
+          type: string
+          enum: [nvidia-kimi, openrouter-pony, local-ollama]
+          description: 供應商識別
+        name:
+          type: string
+          description: 顯示名稱（e.g. NVIDIA Kimi k2.5, OpenRouter Pony Alpha, Local Ollama）
+        status:
+          $ref: '#/components/schemas/ProviderStatus'
+        priority:
+          type: integer
+          minimum: 1
+          description: 在 fallback 中的順序，1 為最優先
+        lastError:
+          type: string
+          description: 若 status 非 available，可選填最後錯誤訊息
+        lastCheckedAt:
+          type: string
+          format: date-time
+
+    ProviderStatus:
+      type: string
+      enum: [available, rate_limited, unavailable, error]
+      description: available 可選用；rate_limited 超限；unavailable 斷線；error 其他錯誤
+
+    ProviderListResponse:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Provider'

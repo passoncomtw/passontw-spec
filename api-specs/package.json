@@ -7,6 +7,7 @@
     "./token-system": "./projects/token-system/openapi.yaml",
     "./games-system": "./projects/games-system/openapi.yaml",
     "./staff-scheduling": "./projects/staff-scheduling/openapi.yaml",
+    "./llm-fallback-gateway": "./projects/llm-fallback-gateway/openapi.yaml",
     "./shared/*": "./shared/*"
   }
 }
