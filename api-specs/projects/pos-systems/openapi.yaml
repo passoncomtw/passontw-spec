@@ -1,62 +1,15 @@
 openapi: 3.0.3
 info:
-  title: POS System API
+  title: POS System Backend API
   version: 1.0.0
   description: |
-    POS 系統含兩套前端與對應後端 API：
+    POS 系統營運後台 API。
 
-    - **營運後台**：Web 後台，後端部署於 Linux server。提供統一 admin 登入/登出、各商家連線狀況。
-    - **商家 App**：Electron 應用，後端部署於各商家樹莓派、區域網路連線。提供員工登入/登出、商品管理（先以關東煮店為基礎）、結帳、連線出單機。
+    提供管理員登入/登出、商家列表查詢功能。
 
 servers:
-  - url: https://api.example.com/pos/admin/v1
-    description: 營運後台 API（Linux server）
-  - url: http://{storeHost}/pos/store/v1
-    description: 商家端 API（樹莓派，區域網路）
-    variables:
-      storeHost:
-        default: 192.168.1.1
-
-paths:
-  # --- 營運後台 ---
-  /admin/auth/login:
-    post:
-      summary: 營運後台 admin 登入
-  /admin/auth/logout:
-    post:
-      summary: 營運後台 admin 登出
-  /admin/merchants:
-    get:
-      summary: 商家列表
-  /admin/merchants/{merchantId}/connection-status:
-    get:
-      summary: 單一商家連線狀況
-
-  # --- 商家 App（員工、商品、結帳、出單）---
-  /auth/login:
-    post:
-      summary: 員工登入
-  /auth/logout:
-    post:
-      summary: 員工登出
-  /products:
-    get:
-      summary: 商品列表
-    post:
-      summary: 新增商品（關東煮等）
-  /products/{productId}:
-    get:
-      summary: 單一商品
-    put:
-      summary: 更新商品
-    delete:
-      summary: 刪除商品
-  /checkout:
-    post:
-      summary: 結帳
-  /receipts/print:
-    post:
-      summary: 連線出單機列印
+  - url: http://localhost:8080
+    description: 本地開發環境
 
 components:
   securitySchemes:
@@ -65,5 +18,341 @@ components:
       scheme: bearer
       bearerFormat: JWT
 
+  schemas:
+    # --- 通用 ---
+    FieldError:
+      type: object
+      properties:
+        field:
+          type: string
+          example: account
+        message:
+          type: string
+          example: 帳號不能為空
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: 帳號或密碼錯誤
+        error_code:
+          type: string
+          example: INVALID_CREDENTIALS
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 10
+        total_pages:
+          type: integer
+          example: 5
+        total_count:
+          type: integer
+          example: 47
+        has_next:
+          type: boolean
+          example: true
+        has_previous:
+          type: boolean
+          example: false
+
+    # --- 認證 ---
+    LoginRequest:
+      type: object
+      required:
+        - account
+        - password
+      properties:
+        account:
+          type: string
+          example: admin
+        password:
+          type: string
+          example: a12345678
+
+    UserDTO:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        account:
+          type: string
+          example: admin
+        name:
+          type: string
+          example: 系統管理員
+        role:
+          type: string
+          example: admin
+        email:
+          type: string
+          format: email
+          example: admin@passon.tw
+
+    LoginData:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          example: Bearer
+        user:
+          $ref: '#/components/schemas/UserDTO'
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 登入成功
+        data:
+          $ref: '#/components/schemas/LoginData'
+
+    # --- 商家 ---
+    MerchantDTO:
+      type: object
+      properties:
+        merchant_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440001
+        merchant_name:
+          type: string
+          example: 測試商家A
+        status:
+          type: string
+          enum: [online, offline]
+          example: online
+        updated_at:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T08:00:00Z
+
+    MerchantListData:
+      type: object
+      properties:
+        merchants:
+          type: array
+          items:
+            $ref: '#/components/schemas/MerchantDTO'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    MerchantListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 查詢成功
+        data:
+          $ref: '#/components/schemas/MerchantListData'
+
 security:
   - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: 健康檢查
+      tags: [system]
+      security: []
+      responses:
+        '200':
+          description: 服務正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: backend-service
+
+  /ready:
+    get:
+      summary: 就緒檢查
+      tags: [system]
+      security: []
+      responses:
+        '200':
+          description: 服務就緒
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  service:
+                    type: string
+                    example: backend-service
+
+  /api/admin/auth/login:
+    post:
+      summary: 管理員登入
+      description: 管理員帳號密碼登入，回傳 JWT Token
+      tags: [admin-auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 帳號或密碼錯誤
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: 帳號或密碼錯誤
+                error_code: INVALID_CREDENTIALS
+
+  /api/admin/auth/logout:
+    post:
+      summary: 管理員登出
+      description: 管理員登出，後端回傳成功訊息，前端清除本地 Token
+      tags: [admin-auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: 登出成功
+        '401':
+          description: Token 無效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/merchants:
+    get:
+      summary: 取得商家列表
+      description: 取得商家列表，支援分頁與關鍵字搜尋
+      tags: [admin-merchant]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: 頁碼（最小值 1）
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+            example: 1
+        - name: limit
+          in: query
+          description: 每頁筆數（1～100）
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+            example: 10
+        - name: search
+          in: query
+          description: 搜尋關鍵字（最長 255 字元）
+          schema:
+            type: string
+            maxLength: 255
+            example: 測試
+      responses:
+        '200':
+          description: 查詢成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantListResponse'
+        '400':
+          description: 參數錯誤
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_page:
+                  summary: 頁碼錯誤
+                  value:
+                    success: false
+                    message: 頁碼必須大於 0
+                    error_code: INVALID_PARAMETERS
+                    errors:
+                      - field: page
+                        message: 頁碼必須大於 0
+                invalid_limit:
+                  summary: 每頁筆數錯誤
+                  value:
+                    success: false
+                    message: 每頁筆數必須介於 1~100
+                    error_code: INVALID_PARAMETERS
+                    errors:
+                      - field: limit
+                        message: 每頁筆數必須介於 1~100
+        '401':
+          description: Token 無效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 伺服器錯誤
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: 查詢失敗
+                error_code: INTERNAL_ERROR
