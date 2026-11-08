@@ -12,7 +12,6 @@
 | pos-systems | pos-backend-api 與規格一致；pos-merchant-api 的多數路由不在規格內 |
 | games-system | `paths: {}`，三個程式碼庫皆未找到 |
 | staff-scheduling | `paths: {}`，三個程式碼庫皆未找到 |
-| knowledge-base | 規格有 4 個 path，三個程式碼庫皆未找到對應實作 |
 
 ## 二、p2p-exchange-service
 
@@ -68,7 +67,7 @@
 1. `api-specs/dist/` 被 git 忽略，只存在本機，需以 `scripts/bundle.sh` 重建。
 2. p2p-exchange-service 的 `CHANGELOG.md` 已更新到 1.0.0。
 3. 舊的 `openspec/changes/p2p-exchange-service-v1-p2p-trading` 已標註被取代，尚未移入 `archive/`。
-4. 其他專案（pos-systems、games-system、staff-scheduling、knowledge-base）尚無主規格。
+4. 其他專案（pos-systems、games-system、staff-scheduling）尚無主規格。
 
 ## 五、已做的規格決策（2026-11-08）
 

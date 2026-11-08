@@ -24,7 +24,7 @@
 - 影響 `api-specs/projects/games-system/schemas/game.yaml`：`Game` schema 從空殼補上 `merchantId`、`name`、`externalUrl`、`status`、`createdAt`、`approvedAt` 等欄位。
 - 影響 `api-specs/projects/games-system/schemas/session.yaml`：`Session` schema 從空殼補上 `gameId`、`enteredAt`、`leftAt` 等欄位。
 - 新增 `Merchant` schema（商戶帳號）。
-- 不影響 `pos-systems`、`p2p-exchange-service`、`staff-scheduling`、`knowledge-base`。
+- 不影響 `pos-systems`、`p2p-exchange-service`、`staff-scheduling`。
 
 ## 本次不含（留給後續版本）
 

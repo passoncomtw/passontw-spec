@@ -25,7 +25,7 @@
 - 影響 `api-specs/projects/staff-scheduling/schemas/employee.yaml`：`Employee` schema 從空殼補上 `id`、`name`、`phone`、`password` 等欄位。
 - 影響 `api-specs/projects/staff-scheduling/schemas/shift.yaml`：改為 `Appointment` schema，補上 `id`、`employeeId`、`customerId`、`startTime`、`endTime`、`status`、`cancelledBy` 等欄位。
 - 新增 `Customer` schema（客戶帳號）。
-- 不影響 `pos-systems`、`p2p-exchange-service`、`games-system`、`knowledge-base`。
+- 不影響 `pos-systems`、`p2p-exchange-service`、`games-system`。
 
 ## 本次不含（留給後續版本）
 
