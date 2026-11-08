@@ -1,0 +1,114 @@
+components:
+  schemas:
+    CreateListingRequest:
+      type: object
+      required: [type, cryptoCurrency, fiatCurrency, totalAmount, price, minOrderFiat, maxOrderFiat, paymentTimeLimit]
+      properties:
+        type:
+          $ref: './common.yaml#/components/schemas/ListingType'
+        cryptoCurrency:
+          type: string
+          description: 加密貨幣代碼，須為存在且啟用的幣種
+          example: USDT
+        fiatCurrency:
+          type: string
+          description: 法幣代碼，須為存在且啟用的幣種
+          example: TWD
+        totalAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        price:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        minOrderFiat:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        maxOrderFiat:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        paymentTimeLimit:
+          type: integer
+          format: int64
+          minimum: 15
+          description: 付款時限（分鐘），至少 15
+        paymentMethodId:
+          type: integer
+          format: int64
+          description: 收款帳戶 ID。type=sell 時必填。
+
+    CreateListingResponse:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+
+    ListingItem:
+      type: object
+      required:
+        - id
+        - userId
+        - type
+        - cryptoCurrency
+        - fiatCurrency
+        - totalAmount
+        - remainingAmount
+        - price
+        - minOrderFiat
+        - maxOrderFiat
+        - platformFeeBase
+        - platformFeeRate
+        - paymentFeeBase
+        - paymentFeeRate
+        - paymentTimeLimit
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        type:
+          $ref: './common.yaml#/components/schemas/ListingType'
+        cryptoCurrency:
+          type: string
+        fiatCurrency:
+          type: string
+        totalAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        remainingAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        price:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        minOrderFiat:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        maxOrderFiat:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        platformFeeBase:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        platformFeeRate:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        paymentFeeBase:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        paymentFeeRate:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        paymentTimeLimit:
+          type: integer
+          format: int64
+          description: 付款時限（分鐘）
+        paymentMethodId:
+          type: integer
+          format: int64
+          description: 收款帳戶 ID，未設定時省略
+        status:
+          $ref: './common.yaml#/components/schemas/ListingStatus'
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    ListingListResponse:
+      type: object
+      required: [list]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ListingItem'

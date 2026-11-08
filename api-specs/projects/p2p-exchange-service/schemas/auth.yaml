@@ -1,0 +1,155 @@
+components:
+  schemas:
+    AppCredentialsRequest:
+      type: object
+      description: App 登入與註冊共用的帳密請求
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: 註冊時去除頭尾空白後長度須為 3 到 50 個字元
+          example: alice
+        password:
+          type: string
+          format: password
+          description: 註冊時至少 8 個字元
+          example: password123
+
+    AppLoginUserInfo:
+      type: object
+      required: [id, account, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+        account:
+          type: string
+        name:
+          type: string
+
+    AppLoginResponse:
+      type: object
+      required: [access_token, expireIn, user]
+      properties:
+        access_token:
+          type: string
+          description: App JWT（HS256），以 Authorization Bearer 帶入
+        expireIn:
+          type: integer
+          format: int64
+          description: 有效秒數
+        user:
+          $ref: '#/components/schemas/AppLoginUserInfo'
+
+    BackendLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+
+    BackendLoginResponse:
+      type: object
+      required: [token, expiresIn]
+      properties:
+        token:
+          type: string
+          description: Backend JWT（HS256），以 Authorization Bearer 帶入
+        expiresIn:
+          type: integer
+          format: int64
+          description: 有效秒數
+
+    ProfileResponse:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+          description: 取自 JWT 的 username claim
+
+    UpdatePushTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: Expo 推播 token。空字串時直接回成功且不寫入。
+
+    PaymentMethodCreateRequest:
+      type: object
+      required: [type, bankName, accountName, accountNumber]
+      properties:
+        type:
+          type: string
+          description: 收款方式類型。待確認：可用值未在 swagger.api 與 service 中列舉。
+          example: bank_transfer
+        bankName:
+          type: string
+        accountName:
+          type: string
+        accountNumber:
+          type: string
+
+    PaymentMethodCreateResponse:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+
+    PaymentMethodItem:
+      type: object
+      required: [id, type, bankName, accountName, accountNumber, isActive]
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+        bankName:
+          type: string
+        accountName:
+          type: string
+        accountNumber:
+          type: string
+        isActive:
+          type: boolean
+
+    PaymentMethodListResponse:
+      type: object
+      required: [list]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentMethodItem'
+
+    VersionResponse:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: string
+          example: v1.0.0
+
+    HealthzResponse:
+      type: object
+      description: 各依賴的檢查結果。值為 "ok" 或 "unhealthy - 原因"。Redis 與 NATS 未設定時不出現。
+      properties:
+        database:
+          type: string
+          example: ok
+        redis:
+          type: string
+          example: ok
+        nats:
+          type: string
+          example: ok
+      additionalProperties:
+        type: string

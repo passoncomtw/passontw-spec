@@ -1,0 +1,11 @@
+schema: spec-driven
+
+# Project context
+context: |
+  本 repo 只有規格文件，沒有應用程式原始碼。
+  規格的目的是讓開發人員直接依據規格實作，不需要回頭詢問或猜測。
+  規格內容以實際程式碼與已驗證的資訊為準，不確定的部分明確標示，不推測。
+  API 規格放在 api-specs/projects/<project>/openapi.yaml。
+  規格與實作的現況落差見 documents/spec-code-gap-analysis.md。
+  文件使用繁體中文，程式碼與欄位命名使用英文。
+  token-system 已改名為 p2p-exchange-service，兩者是同一個專案。

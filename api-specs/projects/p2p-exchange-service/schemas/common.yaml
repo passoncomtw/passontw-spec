@@ -1,0 +1,85 @@
+components:
+  schemas:
+    Decimal:
+      type: string
+      description: >-
+        非負十進位字串，用於所有金額、數量、價格、費用與餘額欄位。
+        整數部分最多 20 位，小數部分最多 18 位。不使用 JSON number，避免浮點精度誤差。
+      pattern: '^\d{1,20}(\.\d{1,18})?$'
+      example: '100.5'
+
+    Timestamp:
+      type: string
+      format: date-time
+      description: ISO 8601 時間字串（UTC，RFC3339）
+      example: '2026-11-08T08:30:00Z'
+
+    ResponseEnvelope:
+      type: object
+      description: 所有 JSON 回應的統一外層格式。成功為 HTTP 200、code 0、message "success"。
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          description: 成功為 0；失敗時等於 HTTP status
+          example: 0
+        message:
+          type: string
+          example: success
+        data:
+          description: 業務資料；無資料的成功回應與所有失敗回應為 null
+          nullable: true
+
+    ErrorEnvelope:
+      type: object
+      description: 失敗回應。HTTP status 等於 code，data 一律為 null。
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          enum: [400, 401, 403, 404, 409, 500, 503]
+          example: 400
+        message:
+          type: string
+          example: insufficient balance
+        data:
+          type: object
+          nullable: true
+          description: 一律為 null
+
+    EmptyEnvelope:
+      type: object
+      description: 成功但沒有業務資料的回應（data 為 null）
+      required: [code, message, data]
+      properties:
+        code:
+          type: integer
+          enum: [0]
+        message:
+          type: string
+          example: success
+        data:
+          type: object
+          nullable: true
+          description: 一律為 null
+
+    ListingType:
+      type: string
+      description: >-
+        掛單方向，以掛單者的角度表示。sell：掛單者賣出加密貨幣（吃單者為買方）；
+        buy：掛單者買入加密貨幣（吃單者為賣方）。
+      enum: [buy, sell]
+
+    ListingStatus:
+      type: string
+      description: 掛單狀態。active 與 paused 為進行中；completed 與 cancelled 為終態。
+      enum: [active, paused, completed, cancelled]
+
+    OrderStatus:
+      type: string
+      description: >-
+        訂單狀態。matched：已成交待付款；paid：買方已標記付款；releasing：放行中；
+        completed：已完成；cancelled：買賣雙方取消；timeout：付款逾時由系統取消；
+        disputed：糾紛中待後台仲裁；refunded：仲裁退款。
+        非終態為 matched、paid、releasing、disputed。
+      enum: [matched, paid, releasing, completed, cancelled, timeout, disputed, refunded]

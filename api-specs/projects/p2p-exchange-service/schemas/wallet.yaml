@@ -1,0 +1,53 @@
+components:
+  schemas:
+    WalletItem:
+      type: object
+      required: [currency, availableBalance, frozenBalance]
+      properties:
+        currency:
+          type: string
+          example: USDT
+        availableBalance:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        frozenBalance:
+          $ref: './common.yaml#/components/schemas/Decimal'
+
+    WalletListResponse:
+      type: object
+      required: [list]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/WalletItem'
+
+    WalletLedgerItem:
+      type: object
+      required: [type, amount, balanceAfter, createdAt]
+      properties:
+        type:
+          type: string
+          description: >-
+            帳本類型。已知值包含 fiat_deposit、withdraw。待確認：完整列舉未在可讀取的程式碼中集中定義。
+        amount:
+          type: string
+          description: 變動金額，扣減時帶負號（例如 "-10.5"），因此不套用非負的 Decimal pattern。
+          pattern: '^-?\d{1,20}(\.\d{1,18})?$'
+        balanceAfter:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        refOrderNo:
+          type: string
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    WalletLedgerListResponse:
+      type: object
+      required: [list, total]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/WalletLedgerItem'
+        total:
+          type: integer
+          format: int64

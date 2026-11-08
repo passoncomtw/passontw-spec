@@ -1,0 +1,102 @@
+openapi: 3.0.3
+info:
+  title: Knowledge Base API
+  version: 1.0.0
+  description: |
+    個人知識庫服務的 LLM 後端：雲端算力三重備援（Fallback）閘道。
+    依「速度與性能」由高到低排列供應商，OpenClaw、n8n（TGBot 筆記整理 workflow）
+    或其他客戶端可呼叫統一 API，閘道自動在前一供應商超限或斷線時切換下一順位。
+
+    預設順序：1. NVIDIA Kimi k2.5 → 2. OpenRouter (e.g. Pony Alpha) → 3. 本地 LLM (e.g. Ollama)
+
+    現況：TGBot 對話流程（n8n workflow）已完成，但目前直接呼叫外部 LLM，尚未串接本閘道；
+    本閘道服務本身尚未實作，僅有此規格。
+
+servers:
+  - url: http://localhost:11435/v1
+    description: 閘道本機（可與 OpenClaw 同機或獨立部署）
+
+paths:
+  # 統一聊天介面（OpenAI 相容），閘道依 fallback 順序嘗試
+  /chat/completions:
+    post:
+      summary: 統一聊天完成
+      description: 依目前 fallback 順序依序嘗試，直到成功或全部失敗
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/chat.yaml#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: 成功（由其中一供應商回應）
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/chat.yaml#/components/schemas/ChatCompletionResponse'
+        '503':
+          description: 所有供應商皆不可用
+
+  # 供應商狀態（供監控與除錯）
+  /providers:
+    get:
+      summary: 供應商列表與狀態
+      description: 取得所有供應商、目前狀態及在 fallback 中的順序
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/provider.yaml#/components/schemas/ProviderListResponse'
+
+  /providers/{providerId}:
+    get:
+      summary: 單一供應商狀態
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [nvidia-kimi, openrouter-pony, local-ollama]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/provider.yaml#/components/schemas/Provider'
+        '404':
+          description: 供應商不存在
+
+  # Fallback 順序設定（可選，實作可改為僅設定檔）
+  /fallback:
+    get:
+      summary: 取得目前 fallback 順序
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/fallback.yaml#/components/schemas/FallbackConfig'
+    put:
+      summary: 設定 fallback 順序
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/fallback.yaml#/components/schemas/FallbackConfig'
+      responses:
+        '200':
+          description: 更新成功
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security: []

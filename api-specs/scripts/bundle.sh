@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$ROOT_DIR"
 
-PROJECTS="pos-systems token-system games-system staff-scheduling llm-fallback-gateway"
+PROJECTS="pos-systems p2p-exchange-service games-system staff-scheduling knowledge-base"
 mkdir -p dist
 
 for project in $PROJECTS; do

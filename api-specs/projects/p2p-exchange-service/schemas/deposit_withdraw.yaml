@@ -1,0 +1,218 @@
+components:
+  schemas:
+    FiatDepositRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+
+    FiatDepositResponse:
+      type: object
+      required: [merchantTradeNo, paymentUrl, formParams]
+      properties:
+        merchantTradeNo:
+          type: string
+        paymentUrl:
+          type: string
+          description: ECPay 付款頁網址
+        formParams:
+          type: object
+          description: 前端需以 POST form 送往 paymentUrl 的欄位
+          additionalProperties:
+            type: string
+
+    FiatDepositItem:
+      type: object
+      required: [id, currency, amount, merchantTradeNo, status, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          example: TWD
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        merchantTradeNo:
+          type: string
+        status:
+          type: string
+          description: 入金狀態。待確認：可用值未在可讀取的程式碼中集中列舉。
+        paymentType:
+          type: string
+        paidAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    FiatDepositListResponse:
+      type: object
+      required: [list, total]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/FiatDepositItem'
+        total:
+          type: integer
+          format: int64
+
+    FiatWithdrawRequest:
+      type: object
+      required: [amount, bankCode, bankAccount, accountName]
+      properties:
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        bankCode:
+          type: string
+          pattern: '^\d{3}$'
+          description: 3 位數字銀行代碼
+        bankAccount:
+          type: string
+          pattern: '^\d{6,20}$'
+          description: 6 到 20 位數字銀行帳號
+        accountName:
+          type: string
+
+    WithdrawCreateResponse:
+      type: object
+      description: 提領申請建立結果（法幣與加密貨幣共用）
+      required: [id, status]
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          example: pending
+
+    FiatWithdrawalItem:
+      type: object
+      required: [id, currency, amount, bankCode, bankAccountTail, status, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          example: TWD
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        bankCode:
+          type: string
+        bankAccountTail:
+          type: string
+          description: 遮蔽後的銀行帳號
+        status:
+          type: string
+          description: 已知值：pending、approved、rejected
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    FiatWithdrawalListResponse:
+      type: object
+      required: [list, total]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/FiatWithdrawalItem'
+        total:
+          type: integer
+          format: int64
+
+    CryptoDepositInfoResponse:
+      type: object
+      required: [address, memo, network, currency, contractAddress]
+      properties:
+        address:
+          type: string
+        memo:
+          type: string
+        network:
+          type: string
+          example: TRON
+        currency:
+          type: string
+          example: USDT
+        contractAddress:
+          type: string
+
+    CryptoDepositItem:
+      type: object
+      required: [id, currency, amount, txHash, status, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        txHash:
+          type: string
+        status:
+          type: string
+          description: 充值狀態。待確認：可用值未在可讀取的程式碼中集中列舉。
+        confirmedAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    CryptoDepositListResponse:
+      type: object
+      required: [list, total]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/CryptoDepositItem'
+        total:
+          type: integer
+          format: int64
+
+    CryptoWithdrawRequest:
+      type: object
+      required: [toAddress, amount]
+      properties:
+        toAddress:
+          type: string
+          description: Tron 地址
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+
+    CryptoWithdrawalItem:
+      type: object
+      required: [id, currency, amount, toAddress, status, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        toAddress:
+          type: string
+        txHash:
+          type: string
+        status:
+          type: string
+          description: 已知值：pending、broadcasting、failed。待確認：完成狀態的值未列於可讀取的程式碼。
+        confirmedAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    CryptoWithdrawalListResponse:
+      type: object
+      required: [list, total]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/CryptoWithdrawalItem'
+        total:
+          type: integer
+          format: int64

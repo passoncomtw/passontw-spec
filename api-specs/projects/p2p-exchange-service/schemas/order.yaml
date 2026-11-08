@@ -1,0 +1,123 @@
+components:
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required: [listingId, cryptoAmount]
+      properties:
+        listingId:
+          type: integer
+          format: int64
+        cryptoAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+
+    CreateOrderResponse:
+      type: object
+      required: [id, orderNo]
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderNo:
+          type: string
+          example: P2P20261108123456
+
+    OrderReasonRequest:
+      type: object
+      description: 取消訂單與發起糾紛共用的請求，reason 必填
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+
+    OrderItem:
+      type: object
+      required:
+        - id
+        - orderNo
+        - listingId
+        - listingType
+        - sellerId
+        - buyerId
+        - cryptoCurrency
+        - fiatCurrency
+        - cryptoAmount
+        - price
+        - fiatAmount
+        - platformFeeBase
+        - platformFeeAmount
+        - paymentFeeBase
+        - paymentFeeAmount
+        - totalFee
+        - totalAmount
+        - paymentMethodId
+        - status
+        - paymentDeadline
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        orderNo:
+          type: string
+        listingId:
+          type: integer
+          format: int64
+        listingType:
+          $ref: './common.yaml#/components/schemas/ListingType'
+        sellerId:
+          type: integer
+          format: int64
+        buyerId:
+          type: integer
+          format: int64
+        cryptoCurrency:
+          type: string
+        fiatCurrency:
+          type: string
+        cryptoAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        price:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        fiatAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        platformFeeBase:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        platformFeeAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        paymentFeeBase:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        paymentFeeAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        totalFee:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        totalAmount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        paymentMethodId:
+          type: integer
+          format: int64
+        status:
+          $ref: './common.yaml#/components/schemas/OrderStatus'
+        paymentDeadline:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        paidAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        confirmedAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        completedAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        cancelledAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        cancelReason:
+          type: string
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    OrderListResponse:
+      type: object
+      required: [list]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
