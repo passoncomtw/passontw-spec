@@ -23,7 +23,7 @@
 - **THEN** 回應 HTTP 400 `only active or paused listings can be cancelled`
 
 ### Requirement: 建立掛單
-系統 SHALL 在建立掛單前驗證：`type` 為 `buy` 或 `sell`；`cryptoCurrency`、`fiatCurrency` 存在於 `currencies` 且啟用；`totalAmount > 0`；`price > 0`；`minOrderFiat > 0`；`minOrderFiat <= maxOrderFiat`；`paymentTimeLimit >= 15`（分鐘，系統設定值，預設 15）；`type=sell` 時 `paymentMethodId` 必填，且屬於掛單者、狀態有效。手續費參數（`platformFeeBase`、`platformFeeRate`、`paymentFeeBase`、`paymentFeeRate`）由平台設定，使用者不可指定，目前皆為 0。建立成功的掛單 `status=active`、`remainingAmount=totalAmount`。
+系統 SHALL 在建立掛單前驗證：`type` 為 `buy` 或 `sell`；`cryptoCurrency`、`fiatCurrency` 存在於 `currencies` 且啟用；`totalAmount > 0`；`price > 0`；`minOrderFiat >= 0`；`minOrderFiat <= maxOrderFiat`；`paymentTimeLimit >= 15`（分鐘，系統設定值，預設 15）；`type=sell` 時 `paymentMethodId` 必填，且屬於掛單者、狀態有效。手續費參數（`platformFeeBase`、`platformFeeRate`、`paymentFeeBase`、`paymentFeeRate`）由平台設定，使用者不可指定，目前皆為 0。建立成功的掛單 `status=active`、`remainingAmount=totalAmount`。
 
 #### Scenario: 成功建立 sell 掛單
 - **WHEN** 掛單者以有效欄位建立 `sell` 掛單，且可用餘額足夠
@@ -125,6 +125,7 @@
 
 ## 待確認事項
 
+- `minOrderFiat` 允許為 0（2026-11-08 依實作者回報調整：現行 App 的建立掛單畫面送出 0，要求大於 0 會擋到合法請求）；是否要求大於 0 留待 App 調整後再決定。
 - 一筆限制的範圍：使用者原話是「掛買單，每個幣種各一筆」，本規格解讀為 buy 與 sell 各自每個幣種一筆。若 sell 掛單不應受限，需要使用者決定。
 - 本階段 `buy` 掛單者不凍結法幣（TWD）額度（2026-11-08 已決定）。
 - `paused` 狀態的切換 API 尚未設計（規格預留）。

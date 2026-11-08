@@ -626,7 +626,7 @@ paths:
         規則：
 
         - 每位使用者對每個加密貨幣幣種、每種類型（buy、sell）同時最多一筆進行中（active 或 paused）掛單，違反回 409。
-        - 欄位驗證：totalAmount > 0、price > 0、minOrderFiat <= maxOrderFiat、paymentTimeLimit >= 15（分鐘）、幣種須存在且啟用，違反回 400。
+        - 欄位驗證：totalAmount > 0、price > 0、minOrderFiat >= 0、minOrderFiat <= maxOrderFiat、paymentTimeLimit >= 15（分鐘）、幣種須存在且啟用，違反回 400。
         - type=sell 必須帶 paymentMethodId，否則回 400。
         - sell 掛單於建立時凍結掛單者的 totalAmount，可用餘額不足回 400，訊息為 "insufficient balance"。
 
