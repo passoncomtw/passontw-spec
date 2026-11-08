@@ -1,0 +1,1559 @@
+openapi: 3.0.3
+info:
+  title: P2P Exchange Service API
+  version: 1.0.0
+  description: |
+    P2P 加密貨幣交易平台（p2p-exchange-service）API 規格，描述獨立程式碼庫的實際路由。
+    原專案名稱為 token-system。
+
+    ## 範圍
+    - `/app/*`：App 端，使用 App JWT（`appBearerAuth`）。register 與 login 為公開端點。
+    - `/backend/*`：後台，使用 Backend JWT（`backendBearerAuth`）。login 為公開端點。
+    - `POST /webhook/ecpay/notify`：ECPay 付款結果通知，無 JWT，以 CheckMacValue 驗簽。
+    - `GET /healthz`、`GET /api/v1/version`：公開端點。
+    - 不納入：`/v1/*` legacy 路由（不屬於基準規格）。
+
+    ## 回應格式
+    JSON 回應統一為 `{ code, message, data }`。成功為 HTTP 200、code 0、message "success"；
+    失敗時 HTTP status 等於 code（400、401、403、404、409、500、503），data 為 null。
+    建立類端點成功也是 HTTP 200，不是 201。
+    例外（不使用上述外層格式）：`GET /api/v1/version` 直接回 `{ "version": ... }`；
+    `GET /healthz` 直接回各依賴的檢查結果；`POST /webhook/ecpay/notify` 回純文字 `1|OK` 或 `0|<message>`。
+
+    ## 金額
+    所有金額、數量、價格、費用與餘額欄位一律是 Decimal 字串（見 `Decimal` schema，非負，
+    整數最多 20 位、小數最多 18 位）。現行實作部分欄位仍為 number，屬待修正的落差。
+
+    ## WebSocket（不在 paths 內）
+    - `GET /ws/app`：App 端即時事件推送。
+    - `GET /ws/backend`：後台即時事件推送。
+    - 待確認：連線驗證方式與訊息格式，本規格未涵蓋。
+
+    ## 訂單狀態
+    matched、paid、releasing、completed、cancelled、timeout、disputed、refunded。
+
+    ## 掛單狀態
+    active、paused、completed、cancelled。
+
+servers:
+  - url: https://api.example.com
+    description: 範例位址，實際部署位址依環境而定
+
+tags:
+  - name: System
+    description: 健康檢查與版本
+  - name: App Auth
+    description: App 註冊與登入
+  - name: App Profile
+    description: App 使用者資料
+  - name: App Payment Methods
+    description: 收款帳戶
+  - name: App Wallets
+    description: 錢包、法幣與加密貨幣出入金
+  - name: App Listings
+    description: 掛單
+  - name: App Orders
+    description: 訂單
+  - name: Backend Auth
+    description: 後台登入
+  - name: Backend Admin
+    description: 後台管理
+  - name: Webhook
+    description: 第三方回呼
+
+paths:
+  /api/v1/version:
+    get:
+      operationId: getVersion
+      tags: [System]
+      summary: 取得服務版本
+      description: |
+        公開端點。回應不使用 `{ code, message, data }` 外層，直接回傳 `{ "version": "v1.0.0" }`。
+      security: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/auth.yaml#/components/schemas/VersionResponse'
+
+  /healthz:
+    get:
+      operationId: getHealthz
+      tags: [System]
+      summary: 健康檢查
+      description: |
+        供 k8s liveness 與 readiness probe 使用。檢查 database（必要）與 Redis、NATS（選用，未設定時不計入）。回應不使用 `{ code, message, data }` 外層。任一已啟用依賴不健康時回 503，內容格式相同。
+      security: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/auth.yaml#/components/schemas/HealthzResponse'
+        '503':
+          description: 至少一個已啟用的依賴不健康
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/auth.yaml#/components/schemas/HealthzResponse'
+
+  /app/auth/register:
+    post:
+      operationId: appRegister
+      tags: [App Auth]
+      summary: App 使用者註冊
+      description: |
+        公開端點。註冊成功等同登入成功，回傳與登入相同的結構。
+
+        驗證：username 去除頭尾空白後長度 3 到 50，password 至少 8 個字元。註冊時同時建立預設 USDT 錢包。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/auth.yaml#/components/schemas/AppCredentialsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/auth.yaml#/components/schemas/AppLoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/auth/login:
+    post:
+      operationId: appLogin
+      tags: [App Auth]
+      summary: App 使用者登入
+      description: |
+        公開端點。帳號或密碼錯誤回 401。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/auth.yaml#/components/schemas/AppCredentialsRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/auth.yaml#/components/schemas/AppLoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /app/profile:
+    get:
+      operationId: appGetProfile
+      tags: [App Profile]
+      summary: 取得使用者資料
+      description: |
+        回傳取自 JWT 的 username。
+      security:
+        - appBearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/auth.yaml#/components/schemas/ProfileResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /app/profile/push-token:
+    put:
+      operationId: appUpdatePushToken
+      tags: [App Profile]
+      summary: 更新推播 token
+      description: |
+        更新對象一律取自 JWT，不接受 body 指定使用者。token 為空字串時直接回成功且不寫入。
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/auth.yaml#/components/schemas/UpdatePushTokenRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/payment-methods:
+    post:
+      operationId: appCreatePaymentMethod
+      tags: [App Payment Methods]
+      summary: 新增收款帳戶
+      description: |
+        為目前使用者新增收款帳戶，新建立的帳戶 isActive 為 true。
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/auth.yaml#/components/schemas/PaymentMethodCreateRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/auth.yaml#/components/schemas/PaymentMethodCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      operationId: appListPaymentMethods
+      tags: [App Payment Methods]
+      summary: 查詢收款帳戶列表
+      description: |
+        回傳目前使用者的收款帳戶。
+      security:
+        - appBearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/auth.yaml#/components/schemas/PaymentMethodListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/payment-methods/{id}:
+    delete:
+      operationId: appDeletePaymentMethod
+      tags: [App Payment Methods]
+      summary: 刪除收款帳戶
+      description: |
+        軟刪除目前使用者的收款帳戶。
+
+        待確認：收款帳戶不存在或不屬於目前使用者時的回應。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/wallets:
+    get:
+      operationId: appListWallets
+      tags: [App Wallets]
+      summary: 查詢各幣別錢包餘額
+      description: |
+        回傳目前使用者各幣別的可用餘額與凍結餘額。
+      security:
+        - appBearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/wallet.yaml#/components/schemas/WalletListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/wallets/{currency}/ledgers:
+    get:
+      operationId: appListWalletLedgers
+      tags: [App Wallets]
+      summary: 查詢錢包帳本流水
+      description: |
+        以目前使用者與幣別定位錢包後查詢帳本。使用者沒有該幣別錢包時回 404。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: currency
+          in: path
+          required: true
+          description: 幣別代碼
+          schema:
+            type: string
+            example: USDT
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/wallet.yaml#/components/schemas/WalletLedgerListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/wallets/fiat/deposit:
+    post:
+      operationId: appCreateFiatDeposit
+      tags: [App Wallets]
+      summary: 建立 TWD 入金訂單
+      description: |
+        建立入金單並回傳導轉 ECPay 所需的網址與表單欄位。金額須在 100 到 50000 TWD 之間。ECPay 未啟用時回 503。
+
+        現行 swagger.api 的 amount 為整數 TWD，已決定（2026-11-08）所有金額統一使用同一種 Decimal，故為 Decimal 字串。
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/deposit_withdraw.yaml#/components/schemas/FiatDepositRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/deposit_withdraw.yaml#/components/schemas/FiatDepositResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /app/wallets/fiat/deposits:
+    get:
+      operationId: appListFiatDeposits
+      tags: [App Wallets]
+      summary: 查詢 TWD 入金紀錄
+      description: |
+        分頁回傳目前使用者的入金紀錄。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/deposit_withdraw.yaml#/components/schemas/FiatDepositListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/wallets/fiat/withdraw:
+    post:
+      operationId: appCreateFiatWithdraw
+      tags: [App Wallets]
+      summary: 建立 TWD 提領申請
+      description: |
+        凍結使用者餘額並建立 pending 提領申請，於同一交易內完成。金額須在 100 到 100000 TWD 之間，bankCode 為 3 位數字，bankAccount 為 6 到 20 位數字。餘額不足回 400。
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/deposit_withdraw.yaml#/components/schemas/FiatWithdrawRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/deposit_withdraw.yaml#/components/schemas/WithdrawCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/wallets/fiat/withdrawals:
+    get:
+      operationId: appListFiatWithdrawals
+      tags: [App Wallets]
+      summary: 查詢 TWD 提領紀錄
+      description: |
+        分頁回傳目前使用者的提領紀錄，銀行帳號只回傳遮蔽後的尾碼。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/deposit_withdraw.yaml#/components/schemas/FiatWithdrawalListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/wallets/crypto/deposit-info:
+    get:
+      operationId: appGetCryptoDepositInfo
+      tags: [App Wallets]
+      summary: 取得 USDT 充值地址
+      description: |
+        回傳平台充值地址與 memo。USDT 充值功能未啟用時回 503。
+      security:
+        - appBearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/deposit_withdraw.yaml#/components/schemas/CryptoDepositInfoResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /app/wallets/crypto/deposits:
+    get:
+      operationId: appListCryptoDeposits
+      tags: [App Wallets]
+      summary: 查詢 USDT 充值紀錄
+      description: |
+        分頁回傳目前使用者的充值紀錄。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/deposit_withdraw.yaml#/components/schemas/CryptoDepositListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/wallets/crypto/withdraw:
+    post:
+      operationId: appCreateCryptoWithdraw
+      tags: [App Wallets]
+      summary: 建立 USDT 提領申請
+      description: |
+        提領歸屬人取自 JWT。toAddress 須為有效的 Tron 地址，最低提領金額 10 USDT，餘額不足回 400。
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/deposit_withdraw.yaml#/components/schemas/CryptoWithdrawRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/deposit_withdraw.yaml#/components/schemas/WithdrawCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/wallets/crypto/withdrawals:
+    get:
+      operationId: appListCryptoWithdrawals
+      tags: [App Wallets]
+      summary: 查詢 USDT 提領紀錄
+      description: |
+        分頁回傳目前使用者的提領紀錄。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/deposit_withdraw.yaml#/components/schemas/CryptoWithdrawalListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/listings:
+    post:
+      operationId: appCreateListing
+      tags: [App Listings]
+      summary: 建立掛單
+      description: |
+        規則：
+
+        - 每位使用者對每個加密貨幣幣種、每種類型（buy、sell）同時最多一筆進行中（active 或 paused）掛單，違反回 409。
+        - 欄位驗證：totalAmount > 0、price > 0、minOrderFiat >= 0、minOrderFiat <= maxOrderFiat、paymentTimeLimit >= 15（分鐘）、幣種須存在且啟用，違反回 400。
+        - type=sell 必須帶 paymentMethodId，否則回 400。
+        - sell 掛單於建立時凍結掛單者的 totalAmount，可用餘額不足回 400，訊息為 "insufficient balance"。
+
+        成功回 HTTP 200（不是 201）。
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/listing.yaml#/components/schemas/CreateListingRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/listing.yaml#/components/schemas/CreateListingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      operationId: appListListings
+      tags: [App Listings]
+      summary: 查詢掛單列表
+      description: |
+        依 type、status 篩選並分頁。待確認：未帶 status 時是否預設只回 active 掛單。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: 掛單方向
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ListingType'
+        - name: status
+          in: query
+          required: false
+          description: 掛單狀態
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ListingStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/listing.yaml#/components/schemas/ListingListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/listings/mine:
+    get:
+      operationId: appListMyListings
+      tags: [App Listings]
+      summary: 查詢我的掛單
+      description: |
+        回傳目前使用者建立的掛單，篩選與分頁同掛單列表。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: 掛單方向
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ListingType'
+        - name: status
+          in: query
+          required: false
+          description: 掛單狀態
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ListingStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/listing.yaml#/components/schemas/ListingListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/listings/{id}:
+    get:
+      operationId: appGetListing
+      tags: [App Listings]
+      summary: 查詢掛單詳情
+      description: |
+        掛單不存在回 404。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/listing.yaml#/components/schemas/ListingItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/listings/{id}/cancel:
+    put:
+      operationId: appCancelListing
+      tags: [App Listings]
+      summary: 取消掛單
+      description: |
+        規則：
+
+        - 只有掛單者本人可取消，否則回 403。
+        - 只有進行中（active 或 paused）的掛單可取消，否則回 400。
+        - 該掛單有任何非終態訂單（matched、paid、releasing、disputed）時回 400。
+        - 成功後返還掛單剩餘的凍結額度。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/orders:
+    post:
+      operationId: appCreateOrder
+      tags: [App Orders]
+      summary: 吃單（建立訂單）
+      description: |
+        規則：
+
+        - cryptoAmount > 0。
+        - 掛單須為 active，且 cryptoAmount 不可超過掛單剩餘量，否則回 400。
+        - 不可吃自己的掛單，違反回 400。
+        - 單筆法幣金額（cryptoAmount 乘以 price）須落在掛單的 minOrderFiat 到 maxOrderFiat，否則回 400。
+        - buy 掛單由吃單者（賣方）凍結 cryptoAmount；sell 掛單使用掛單者已凍結的額度。
+        - 整個流程在鎖與單一交易內完成。
+
+        成功回 HTTP 200（不是 201），訂單狀態為 matched。
+      security:
+        - appBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/order.yaml#/components/schemas/CreateOrderRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/order.yaml#/components/schemas/CreateOrderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      operationId: appListOrders
+      tags: [App Orders]
+      summary: 查詢訂單列表
+      description: |
+        回傳目前使用者參與的訂單（買方或賣方）。role 為 buyer 或 seller 時只回該角色的訂單。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - name: role
+          in: query
+          required: false
+          description: 訂單角色；未帶時回買方與賣方的訂單
+          schema:
+            type: string
+            enum: [buyer, seller]
+        - name: status
+          in: query
+          required: false
+          description: 訂單狀態
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/OrderStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/order.yaml#/components/schemas/OrderListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/orders/{id}:
+    get:
+      operationId: appGetOrder
+      tags: [App Orders]
+      summary: 查詢訂單詳情
+      description: |
+        訂單不存在回 404。僅訂單的買方或賣方可查詢，其他使用者回 403。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/order.yaml#/components/schemas/OrderItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/orders/{id}/pay:
+    put:
+      operationId: appPayOrder
+      tags: [App Orders]
+      summary: 標記已付款
+      description: |
+        僅買方可操作，訂單須為 matched，成功後狀態為 paid。非買方回 403，狀態不符回 400。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/orders/{id}/confirm:
+    put:
+      operationId: appConfirmOrder
+      tags: [App Orders]
+      summary: 確認收款
+      description: |
+        僅賣方可操作，非賣方回 403。狀態流轉：paid、releasing、completed。
+
+        - 對已 completed 的訂單重複呼叫為冪等，回成功。
+        - disputed 的訂單回 400。
+        - 其他非 paid 狀態回 400。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/orders/{id}/cancel:
+    put:
+      operationId: appCancelOrder
+      tags: [App Orders]
+      summary: 取消訂單
+      description: |
+        僅 matched 狀態可取消，買賣雙方皆可，非訂單雙方回 403，狀態不符回 400。body 的 reason 必填。成功後還原掛單剩餘量並返還額度，訂單狀態為 cancelled。
+
+        付款逾時由系統自動取消，邏輯與此相同，訂單狀態為 timeout。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/order.yaml#/components/schemas/OrderReasonRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /app/orders/{id}/dispute:
+    put:
+      operationId: appDisputeOrder
+      tags: [App Orders]
+      summary: 發起糾紛
+      description: |
+        僅 paid 狀態可發起，買賣雙方皆可，非訂單雙方回 403，狀態不符回 400。body 的 reason 必填。成功後訂單狀態為 disputed，等待後台仲裁。
+      security:
+        - appBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/order.yaml#/components/schemas/OrderReasonRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /backend/auth/login:
+    post:
+      operationId: backendLogin
+      tags: [Backend Auth]
+      summary: 後台管理員登入
+      description: |
+        公開端點。帳號或密碼錯誤回 401。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/auth.yaml#/components/schemas/BackendLoginRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/auth.yaml#/components/schemas/BackendLoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /backend/dashboard:
+    get:
+      operationId: backendGetDashboard
+      tags: [Backend Admin]
+      summary: 後台 Dashboard
+      description: |
+        回傳取自 Backend JWT 的 username 與 role。
+      security:
+        - backendBearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/backend.yaml#/components/schemas/BackendDashboardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /backend/listings:
+    get:
+      operationId: backendListListings
+      tags: [Backend Admin]
+      summary: 後台查詢掛單列表
+      description: |
+        依 type、status 篩選並分頁。
+      security:
+        - backendBearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: 掛單方向
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ListingType'
+        - name: status
+          in: query
+          required: false
+          description: 掛單狀態
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ListingStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/listing.yaml#/components/schemas/ListingListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /backend/orders:
+    get:
+      operationId: backendListOrders
+      tags: [Backend Admin]
+      summary: 後台查詢訂單列表
+      description: |
+        依 status 篩選並分頁。
+      security:
+        - backendBearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: 訂單狀態
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/OrderStatus'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/order.yaml#/components/schemas/OrderListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /backend/orders/{id}/resolve:
+    put:
+      operationId: backendResolveOrder
+      tags: [Backend Admin]
+      summary: 後台仲裁糾紛訂單
+      description: |
+        僅 disputed 的訂單可仲裁，否則回 400。reason 必填。
+
+        - action=complete：訂單轉為 completed，放行給買方。
+        - action=refund：訂單轉為 refunded，返還賣方。
+
+        操作人取自 Backend JWT，不可來自 body。
+      security:
+        - backendBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/backend.yaml#/components/schemas/ResolveOrderRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /backend/members:
+    get:
+      operationId: backendListMembers
+      tags: [Backend Admin]
+      summary: 後台查詢會員列表
+      description: |
+        依 keyword 搜尋並分頁，limit 預設 10。待確認：keyword 比對的欄位。
+      security:
+        - backendBearerAuth: []
+      parameters:
+        - name: keyword
+          in: query
+          required: false
+          description: 搜尋關鍵字
+          schema:
+            type: string
+        - $ref: '#/components/parameters/MemberLimit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/backend.yaml#/components/schemas/MemberListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /backend/members/{id}/deposit:
+    post:
+      operationId: backendDepositToMember
+      tags: [Backend Admin]
+      summary: 後台手動為會員入金
+      description: |
+        amount 須為正數，currency 必填且須為支援的幣種，會員不存在回 404。操作人取自 Backend JWT，不接受 body 指定。回應欄位名稱為 snake_case（available_balance、frozen_balance），與其他端點不同，依實作如此。
+      security:
+        - backendBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/backend.yaml#/components/schemas/MemberDepositRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/backend.yaml#/components/schemas/MemberDepositResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /backend/platform/wallet-info:
+    get:
+      operationId: backendGetPlatformWalletInfo
+      tags: [Backend Admin]
+      summary: 查詢平台熱錢包資訊
+      description: |
+        回傳平台熱錢包的鏈上餘額與虛擬餘額，以及 ECPay 設定狀態。
+      security:
+        - backendBearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/backend.yaml#/components/schemas/PlatformWalletInfoResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /backend/fiat-withdrawals:
+    get:
+      operationId: backendListFiatWithdrawals
+      tags: [Backend Admin]
+      summary: 後台查詢法幣提領申請
+      description: |
+        status 預設為 pending。
+      security:
+        - backendBearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: 提領狀態，已知值 pending、approved、rejected
+          schema:
+            type: string
+            default: pending
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './schemas/common.yaml#/components/schemas/ResponseEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: './schemas/backend.yaml#/components/schemas/BackendFiatWithdrawalListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /backend/fiat-withdrawals/{id}/review:
+    put:
+      operationId: backendReviewFiatWithdrawal
+      tags: [Backend Admin]
+      summary: 後台審核法幣提領申請
+      description: |
+        action 為 approve 或 reject，reject 必須帶 reason，否則回 400。
+
+        - approve：自凍結餘額永久扣除。
+        - reject：凍結金額退回可用餘額。
+
+        申請已審核過回 409，不視為冪等成功。審核人取自 Backend JWT，不接受 body 指定。
+      security:
+        - backendBearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/backend.yaml#/components/schemas/ReviewFiatWithdrawalRequest'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/common.yaml#/components/schemas/EmptyEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /webhook/ecpay/notify:
+    post:
+      operationId: ecpayNotify
+      tags: [Webhook]
+      summary: ECPay 付款結果通知
+      description: |
+        由 ECPay 伺服器呼叫，無 JWT；呼叫方身分以 CheckMacValue 簽章驗證。
+
+        請求為 `application/x-www-form-urlencoded`，所有欄位都納入驗簽。處理時使用的欄位包含 MerchantTradeNo、RtnCode、TradeNo、PaymentType。
+
+        回應為 ECPay 協定規定的純文字，且一律 HTTP 200：成功 `1|OK`，失敗 `0|<message>`（例如簽章不符為 `0|signature mismatch`）。改用 4xx、5xx 或 JSON 會使 ECPay 判定未送達而重送。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              description: ECPay 通知欄位，另含 CheckMacValue
+              required: [MerchantTradeNo, RtnCode, CheckMacValue]
+              properties:
+                MerchantTradeNo:
+                  type: string
+                  description: 特店交易編號，對應入金單的 merchantTradeNo
+                RtnCode:
+                  type: string
+                  description: 交易結果代碼，成功時為 1
+                TradeNo:
+                  type: string
+                  description: ECPay 交易編號
+                PaymentType:
+                  type: string
+                  description: 付款方式
+                CheckMacValue:
+                  type: string
+                  description: 簽章
+              additionalProperties:
+                type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 1|OK
+
+components:
+  securitySchemes:
+    appBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: App JWT（簽章密鑰為 App.AccessSecret），用於 /app/*
+    backendBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Backend JWT（簽章密鑰為 Backend.AccessSecret），用於 /backend/*
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      description: 資源 ID
+      schema:
+        type: integer
+        format: int64
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: 每頁筆數
+      schema:
+        type: integer
+        format: int64
+        default: 20
+    MemberLimit:
+      name: limit
+      in: query
+      required: false
+      description: 每頁筆數
+      schema:
+        type: integer
+        format: int64
+        default: 10
+    Offset:
+      name: offset
+      in: query
+      required: false
+      description: 起始偏移
+      schema:
+        type: integer
+        format: int64
+        default: 0
+
+  responses:
+    BadRequest:
+      description: 請求參數或業務規則不符
+      content:
+        application/json:
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ErrorEnvelope'
+    Unauthorized:
+      description: 未登入或 Token 無效
+      content:
+        application/json:
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: 無權限操作
+      content:
+        application/json:
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: 資源不存在
+      content:
+        application/json:
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: 狀態衝突
+      content:
+        application/json:
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ErrorEnvelope'
+    InternalError:
+      description: 伺服器內部錯誤
+      content:
+        application/json:
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ErrorEnvelope'
+    ServiceUnavailable:
+      description: 功能未啟用或依賴不健康
+      content:
+        application/json:
+          schema:
+            $ref: './schemas/common.yaml#/components/schemas/ErrorEnvelope'

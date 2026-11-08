@@ -1,5 +1,0 @@
-components:
-  schemas:
-    Trade:
-      type: object
-      description: 交易，內容後續補充

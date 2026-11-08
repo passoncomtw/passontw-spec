@@ -1,0 +1,167 @@
+components:
+  schemas:
+    BackendDashboardResponse:
+      type: object
+      required: [username, role]
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+
+    ResolveOrderRequest:
+      type: object
+      required: [action, reason]
+      description: 操作人取自 Backend JWT，不接受 body 指定。
+      properties:
+        action:
+          type: string
+          enum: [complete, refund]
+          description: complete 將訂單標為 completed；refund 將訂單標為 refunded
+        reason:
+          type: string
+          minLength: 1
+
+    MemberItem:
+      type: object
+      required: [id, username, email, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+        updatedAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    MemberListResponse:
+      type: object
+      required: [list, total]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemberItem'
+        total:
+          type: integer
+          format: int64
+
+    MemberDepositRequest:
+      type: object
+      required: [currency, amount]
+      description: 操作人取自 Backend JWT，不接受 body 指定。
+      properties:
+        currency:
+          type: string
+          example: USDT
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+
+    MemberDepositResponse:
+      type: object
+      required: [currency, available_balance, frozen_balance]
+      properties:
+        currency:
+          type: string
+        available_balance:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        frozen_balance:
+          $ref: './common.yaml#/components/schemas/Decimal'
+
+    TronWalletInfo:
+      type: object
+      required: [enabled, network, hotWalletAddress, usdtContractAddress, confirmationBlocks, onChainBalance, platformVirtualBalance]
+      properties:
+        enabled:
+          type: boolean
+        network:
+          type: string
+        hotWalletAddress:
+          type: string
+        usdtContractAddress:
+          type: string
+        confirmationBlocks:
+          type: integer
+        onChainBalance:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        platformVirtualBalance:
+          $ref: './common.yaml#/components/schemas/Decimal'
+
+    ECPayInfo:
+      type: object
+      required: [enabled, merchantId, baseUrl]
+      properties:
+        enabled:
+          type: boolean
+        merchantId:
+          type: string
+        baseUrl:
+          type: string
+
+    PlatformWalletInfoResponse:
+      type: object
+      required: [tron, ecpay]
+      properties:
+        tron:
+          $ref: '#/components/schemas/TronWalletInfo'
+        ecpay:
+          $ref: '#/components/schemas/ECPayInfo'
+
+    BackendFiatWithdrawalItem:
+      type: object
+      required: [id, userId, currency, amount, bankCode, bankAccount, accountName, status, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        amount:
+          $ref: './common.yaml#/components/schemas/Decimal'
+        bankCode:
+          type: string
+        bankAccount:
+          type: string
+        accountName:
+          type: string
+        status:
+          type: string
+          description: 已知值：pending、approved、rejected
+        reviewedBy:
+          type: integer
+          format: int64
+        rejectReason:
+          type: string
+        createdAt:
+          $ref: './common.yaml#/components/schemas/Timestamp'
+
+    BackendFiatWithdrawalListResponse:
+      type: object
+      required: [list, total]
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackendFiatWithdrawalItem'
+        total:
+          type: integer
+          format: int64
+
+    ReviewFiatWithdrawalRequest:
+      type: object
+      required: [action]
+      description: 審核人取自 Backend JWT，不接受 body 指定。
+      properties:
+        action:
+          type: string
+          enum: [approve, reject]
+        reason:
+          type: string
+          description: action=reject 時必填

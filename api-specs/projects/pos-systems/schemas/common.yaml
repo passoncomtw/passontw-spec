@@ -1,5 +1,112 @@
 components:
   schemas:
+    FieldError:
+      type: object
+      properties:
+        field:
+          type: string
+          example: account
+        message:
+          type: string
+          example: 帳號不能為空
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: 帳號或密碼錯誤
+        error_code:
+          type: string
+          example: INVALID_CREDENTIALS
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 10
+        total_pages:
+          type: integer
+          example: 5
+        total_count:
+          type: integer
+          example: 47
+        has_next:
+          type: boolean
+          example: true
+        has_previous:
+          type: boolean
+          example: false
+
+    LoginRequest:
+      type: object
+      required:
+        - account
+        - password
+      properties:
+        account:
+          type: string
+          example: admin
+        password:
+          type: string
+          example: a12345678
+
+    UserDTO:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        account:
+          type: string
+          example: admin
+        name:
+          type: string
+          example: 系統管理員
+        role:
+          type: string
+          example: admin
+        email:
+          type: string
+          format: email
+          example: admin@passon.tw
+
+    LoginData:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          example: Bearer
+        user:
+          $ref: '#/components/schemas/UserDTO'
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 登入成功
+        data:
+          $ref: '#/components/schemas/LoginData'
+
     AdminSession:
       type: object
       description: 營運後台 admin 登入 session，內容後續補充

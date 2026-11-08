@@ -6,3 +6,48 @@ components:
     MerchantConnectionStatus:
       type: object
       description: 商家連線狀況（營運後台用），內容後續補充
+
+    MerchantDTO:
+      type: object
+      properties:
+        merchant_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440001
+        merchant_name:
+          type: string
+          example: 測試商家A
+        status:
+          type: string
+          enum: [online, offline]
+          example: online
+        updated_at:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T08:00:00Z
+
+    MerchantListData:
+      type: object
+      properties:
+        merchants:
+          type: array
+          items:
+            $ref: '#/components/schemas/MerchantDTO'
+        pagination:
+          $ref: './common.yaml#/components/schemas/Pagination'
+
+    MerchantListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 查詢成功
+        data:
+          $ref: '#/components/schemas/MerchantListData'
