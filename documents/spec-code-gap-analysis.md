@@ -67,7 +67,7 @@
 
 1. `api-specs/dist/` 被 git 忽略，只存在本機，需以 `scripts/bundle.sh` 重建。
 2. p2p-exchange-service 的 `CHANGELOG.md` 已更新到 1.0.0。
-3. 舊的 `openspec/changes/p2p-exchange-service-v1-p2p-trading` 已標註被取代，尚未移入 `archive/`。
+3. 舊的 `openspec/changes/p2p-exchange-service-v1-p2p-trading` 已標註被取代，並於 2026-11-08 以 `--skip-specs` 移入 `archive/`（未同步到主規格）。
 4. 其他專案（pos-systems、games-system、staff-scheduling、knowledge-base）尚無主規格。
 
 ## 五、已做的規格決策（2026-11-08）
