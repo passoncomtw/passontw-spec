@@ -10,7 +10,6 @@
 | p2p-exchange-service | 幣安 C2C 平台 |
 | games-system | 遊戲遊玩平台 |
 | staff-scheduling | 人員排班 |
-| knowledge-base | 個人知識庫服務（TGBot 筆記整理 + 雲端算力三重備援閘道） |
 
 ## 目錄
 

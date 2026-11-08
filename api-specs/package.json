@@ -7,7 +7,6 @@
     "./p2p-exchange-service": "./projects/p2p-exchange-service/openapi.yaml",
     "./games-system": "./projects/games-system/openapi.yaml",
     "./staff-scheduling": "./projects/staff-scheduling/openapi.yaml",
-    "./knowledge-base": "./projects/knowledge-base/openapi.yaml",
     "./shared/*": "./shared/*"
   }
 }

@@ -27,7 +27,7 @@
 - 影響 `api-specs/projects/pos-systems/schemas/receipt.yaml`：`Receipt` schema 從空殼補上 `id`、`orderId`、`printedAt`、`printerStatus`。
 - 影響 `api-specs/projects/pos-systems/schemas/common.yaml`：`EmployeeSession` schema 從空殼補上欄位。
 - 不影響既有營運後台的 `AdminSession`、`MerchantDTO` 等既有 schema。
-- 不影響 `p2p-exchange-service`、`games-system`、`staff-scheduling`、`knowledge-base`。
+- 不影響 `p2p-exchange-service`、`games-system`、`staff-scheduling`。
 
 ## 本次不含（留給後續版本）
 
